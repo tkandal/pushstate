@@ -16,7 +16,7 @@ type PushModel interface {
 // Cacher holds check-sums, check if a struct is new/changed, restores check-sums and saves check-sums to persistent storage
 type Cacher interface {
 	IsChanged(PushModel) bool
-	Put(model.PushModel)
+	Put(PushModel)
 	Read() error
 	Save() error
 	Size() int64

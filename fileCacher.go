@@ -44,11 +44,7 @@ func (fc *FileCache) IsChanged(m PushModel) bool {
 		return true
 	}
 
-	saved := fc.getCache()[m.GetId()]
-	generated := fc.makeCheckSum(m)
-	fc.Logger.Debugf("saved = %s; generated = %s", saved, generated)
-	// return fc.getCache()[m.GetId()] != fc.makeCheckSum(m)
-	return saved != generated
+	return fc.getCache()[m.GetId()] != fc.makeCheckSum(m)
 }
 
 // Put puts the card's check-sum in the cache

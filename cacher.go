@@ -9,9 +9,13 @@ import (
  * Copyright (c) 2019 Norwegian University of Science and Technology
  */
 
+type PushModel interface {
+	GetId() string
+}
+
 // Cacher holds check-sums, check if a struct is new/changed, restores check-sums and saves check-sums to persistent storage
 type Cacher interface {
-	IsChanged(model.PushModel) bool
+	IsChanged(PushModel) bool
 	Put(model.PushModel)
 	Read() error
 	Save() error

@@ -38,7 +38,7 @@ func (fc *FileCache) getCache() map[string]string {
 }
 
 // IsChanged checks if the card is new or changed
-func (fc *FileCache) IsChanged(m model.PushModel) bool {
+func (fc *FileCache) IsChanged(m PushModel) bool {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
@@ -50,7 +50,7 @@ func (fc *FileCache) IsChanged(m model.PushModel) bool {
 }
 
 // Put puts the card's check-sum in the cache
-func (fc *FileCache) Put(m model.PushModel) {
+func (fc *FileCache) Put(m PushModel) {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 

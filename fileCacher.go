@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"git.it.ntnu.no/df/tia/frontend/cards2bas/buffer"
-	"git.it.ntnu.no/df/tia/frontend/cards2bas/model"
 	"github.com/tkandal/checksum"
 	"go.uber.org/zap"
 	"io"
@@ -192,9 +190,7 @@ func (fc *FileCache) Dump() (io.Reader, error) {
 }
 
 func (fc *FileCache) makeCheckSum(v interface{}) string {
-	jsonBuf := buffer.Pool.Get().(*bytes.Buffer)
-	jsonBuf.Reset()
-	defer buffer.Pool.Put(jsonBuf)
+	jsonBuf := &bytes.Buffer{}
 	if err := json.NewEncoder(jsonBuf).Encode(v); err != nil {
 		return ""
 	}

@@ -1,7 +1,6 @@
 package pushstate
 
 import (
-	"git.it.ntnu.no/df/tia/frontend/cards2bas/model"
 	"io"
 )
 

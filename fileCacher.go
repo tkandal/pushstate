@@ -131,11 +131,11 @@ func (fc *FileCache) Size() int64 {
 }
 
 // Get returns the check-sum for the given id
-func (fc *FileCache) Get(feideID string) string {
+func (fc *FileCache) Get(id string) string {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	return fc.getCache()[feideID]
+	return fc.getCache()[id]
 }
 
 // Delete deletes the check-sum for the given id

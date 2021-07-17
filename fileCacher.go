@@ -19,16 +19,30 @@ import (
 
 // FileCache hold check-sums and persists them to a file
 type FileCache struct {
-	Filename   string
-	CheckSum   checksum.CheckSum
-	Logger     *zap.SugaredLogger
+	filename   string
+	checkSum   checksum.CheckSum
+	log        *zap.SugaredLogger
 	stateCache map[string]string
 	isDirty    bool
 	// Protect this cache
-	cacheLock sync.Mutex
+	cacheLock *sync.Mutex
+}
+
+func NewFileCache(sf string, cs checksum.CheckSum, log *zap.SugaredLogger) *FileCache {
+	return &FileCache{
+		filename:   sf,
+		checkSum:   cs,
+		log:        log,
+		stateCache: map[string]string{},
+		isDirty:    false,
+		cacheLock:  &sync.Mutex{},
+	}
 }
 
 func (fc *FileCache) getCache() map[string]string {
+	if fc.stateCache == nil {
+		fc.cacheLock = &sync.Mutex{}
+	}
 	if fc.stateCache == nil {
 		fc.stateCache = map[string]string{}
 	}
@@ -61,7 +75,9 @@ func readFile(filename string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open %s failed; error = %v", filename, err)
 	}
-	defer stateFile.Close()
+	defer func() {
+		_ = stateFile.Close()
+	}()
 
 	cache := map[string]string{}
 	if err = json.NewDecoder(stateFile).Decode(&cache); err != nil && err != io.EOF {
@@ -74,7 +90,7 @@ func (fc *FileCache) Read() error {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	cache, err := readFile(fc.Filename)
+	cache, err := readFile(fc.filename)
 	if err != nil {
 		return err
 	}
@@ -101,7 +117,10 @@ func (fc *FileCache) saveToFile(filename string, cache map[string]string) error 
 		return fmt.Errorf("rename %s to %s failed; error = %v", tmpFile.Name(), filename, err)
 	}
 
-	fc.Logger.Debugf("saved state-cache to %s", filename)
+	if err  = os.Chmod(filename, os.FileMode(0640)); err != nil {
+		fc.log.Warnw(fmt.Sprintf("chmod on %s failed", filename), "error", err)
+	}
+	fc.log.Debugf("saved state-cache to %s", filename)
 
 	return nil
 }
@@ -114,7 +133,7 @@ func (fc *FileCache) Save() error {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	if err := fc.saveToFile(fc.Filename, fc.getCache()); err != nil {
+	if err := fc.saveToFile(fc.filename, fc.getCache()); err != nil {
 		return err
 	}
 	fc.isDirty = false
@@ -143,7 +162,7 @@ func (fc *FileCache) Delete(id string) error {
 
 	delete(fc.getCache(), id)
 	fc.isDirty = true
-	if err := fc.saveToFile(fc.Filename, fc.getCache()); err != nil {
+	if err := fc.saveToFile(fc.filename, fc.getCache()); err != nil {
 		return err
 	}
 	fc.isDirty = false
@@ -157,7 +176,7 @@ func (fc *FileCache) Reset() error {
 
 	cache := map[string]string{}
 	fc.isDirty = true
-	if err := fc.saveToFile(fc.Filename, cache); err != nil {
+	if err := fc.saveToFile(fc.filename, cache); err != nil {
 		return err
 	}
 	fc.stateCache = cache
@@ -170,23 +189,43 @@ func (fc *FileCache) Dump() (io.Reader, error) {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	stateFile, err := os.OpenFile(fc.Filename, os.O_CREATE|os.O_RDONLY, 0644)
+	stateFile, err := os.OpenFile(fc.filename, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("open %s failed; error = %v", fc.Filename, err)
+		return nil, fmt.Errorf("open %s failed; error = %v", fc.filename, err)
 	}
-	defer stateFile.Close()
+	defer func() {
+		if err := stateFile.Close(); err != nil {
+			fc.log.Warnw(fmt.Sprintf("close %s failed", fc.filename), "error", err)
+		}
+	}()
 
 	stats, err := stateFile.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("stat %s failed; error = %v", fc.Filename, err)
+		return nil, fmt.Errorf("stat %s failed; error = %v", fc.filename, err)
 	}
 	buf := bytes.NewBuffer(make([]byte, stats.Size()))
 	buf.Reset()
 	_, err = io.Copy(buf, stateFile)
 	if err != nil {
-		return nil, fmt.Errorf("copy %s to buffer failed; error = %v", fc.Filename, err)
+		return nil, fmt.Errorf("copy %s to buffer failed; error = %v", fc.filename, err)
 	}
 	return buf, nil
+}
+
+func (fc *FileCache) WriteTo(w io.Writer) (int64, error) {
+	fc.cacheLock.Lock()
+	defer fc.cacheLock.Unlock()
+
+	stateFile, err := os.OpenFile(fc.filename, os.O_CREATE|os.O_RDONLY, os.FileMode(0644))
+	if err != nil {
+		return 0, fmt.Errorf("open %s failed; error = %v", fc.filename, err)
+	}
+	defer func() {
+		if err := stateFile.Close(); err != nil {
+			fc.log.Warnf("close %s failed; error = %v", fc.filename, err)
+		}
+	}()
+	return io.Copy(w, stateFile)
 }
 
 func (fc *FileCache) makeCheckSum(v interface{}) string {
@@ -194,5 +233,5 @@ func (fc *FileCache) makeCheckSum(v interface{}) string {
 	if err := json.NewEncoder(jsonBuf).Encode(v); err != nil {
 		return ""
 	}
-	return fc.CheckSum.SumBytes(jsonBuf.Bytes())
+	return fc.checkSum.SumBytes(jsonBuf.Bytes())
 }

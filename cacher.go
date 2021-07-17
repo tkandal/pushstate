@@ -23,4 +23,5 @@ type Cacher interface {
 	Delete(string) error
 	Reset() error
 	Dump() (io.Reader, error)
+	WriteTo(io.Writer) (int64, error)
 }

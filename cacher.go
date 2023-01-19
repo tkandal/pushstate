@@ -9,7 +9,7 @@ import (
  */
 
 type PushModel interface {
-	GetId() string
+	GetID() string
 }
 
 // Cacher holds check-sums, check if a struct is new/changed, restores check-sums and saves check-sums to persistent storage

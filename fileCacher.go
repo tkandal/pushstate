@@ -7,7 +7,6 @@ import (
 	"github.com/tkandal/checksum"
 	"go.uber.org/zap"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -54,11 +53,11 @@ func (fc *FileCache) IsChanged(m PushModel) bool {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	if len(fc.getCache()[m.GetId()]) == 0 {
+	if len(fc.getCache()[m.GetID()]) == 0 {
 		return true
 	}
 
-	return fc.getCache()[m.GetId()] != fc.makeCheckSum(m)
+	return fc.getCache()[m.GetID()] != fc.makeCheckSum(m)
 }
 
 // Put puts the card's check-sum in the cache
@@ -66,7 +65,7 @@ func (fc *FileCache) Put(m PushModel) {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	fc.getCache()[m.GetId()] = fc.makeCheckSum(m)
+	fc.getCache()[m.GetID()] = fc.makeCheckSum(m)
 	fc.isDirty = true
 }
 
@@ -99,7 +98,7 @@ func (fc *FileCache) Read() error {
 }
 
 func (fc *FileCache) saveToFile(filename string, cache map[string]string) error {
-	tmpFile, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename))
+	tmpFile, err := os.CreateTemp(filepath.Dir(filename), filepath.Base(filename))
 	if err != nil {
 		return fmt.Errorf("create temporary file failed; error = %v", err)
 	}
@@ -117,7 +116,7 @@ func (fc *FileCache) saveToFile(filename string, cache map[string]string) error 
 		return fmt.Errorf("rename %s to %s failed; error = %v", tmpFile.Name(), filename, err)
 	}
 
-	if err  = os.Chmod(filename, os.FileMode(0640)); err != nil {
+	if err = os.Chmod(filename, os.FileMode(0640)); err != nil {
 		fc.log.Warnw(fmt.Sprintf("chmod on %s failed", filename), "error", err)
 	}
 	fc.log.Debugf("saved state-cache to %s", filename)

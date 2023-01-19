@@ -38,26 +38,16 @@ func NewFileCache(sf string, cs checksum.CheckSum, log *zap.SugaredLogger) *File
 	}
 }
 
-func (fc *FileCache) getCache() map[string]string {
-	if fc.stateCache == nil {
-		fc.cacheLock = &sync.Mutex{}
-	}
-	if fc.stateCache == nil {
-		fc.stateCache = map[string]string{}
-	}
-	return fc.stateCache
-}
-
 // IsChanged checks if the card is new or changed
 func (fc *FileCache) IsChanged(m PushModel) bool {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	if len(fc.getCache()[m.GetID()]) == 0 {
+	cs, ok := fc.stateCache[m.GetID()]
+	if !ok {
 		return true
 	}
-
-	return fc.getCache()[m.GetID()] != fc.makeCheckSum(m)
+	return cs != fc.makeCheckSum(m)
 }
 
 // Put puts the card's check-sum in the cache
@@ -65,7 +55,7 @@ func (fc *FileCache) Put(m PushModel) {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	fc.getCache()[m.GetID()] = fc.makeCheckSum(m)
+	fc.stateCache[m.GetID()] = fc.makeCheckSum(m)
 	fc.isDirty = true
 }
 
@@ -132,7 +122,7 @@ func (fc *FileCache) Save() error {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	if err := fc.saveToFile(fc.filename, fc.getCache()); err != nil {
+	if err := fc.saveToFile(fc.filename, fc.stateCache); err != nil {
 		return err
 	}
 	fc.isDirty = false
@@ -143,7 +133,7 @@ func (fc *FileCache) Save() error {
 func (fc *FileCache) Size() int64 {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
-	return int64(len(fc.getCache()))
+	return int64(len(fc.stateCache))
 }
 
 // Get returns the check-sum for the given id
@@ -151,7 +141,11 @@ func (fc *FileCache) Get(id string) string {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	return fc.getCache()[id]
+	cs, ok := fc.stateCache[id]
+	if !ok {
+		return ""
+	}
+	return cs
 }
 
 // Delete deletes the check-sum for the given id
@@ -159,9 +153,9 @@ func (fc *FileCache) Delete(id string) error {
 	fc.cacheLock.Lock()
 	defer fc.cacheLock.Unlock()
 
-	delete(fc.getCache(), id)
+	delete(fc.stateCache, id)
 	fc.isDirty = true
-	if err := fc.saveToFile(fc.filename, fc.getCache()); err != nil {
+	if err := fc.saveToFile(fc.filename, fc.stateCache); err != nil {
 		return err
 	}
 	fc.isDirty = false
